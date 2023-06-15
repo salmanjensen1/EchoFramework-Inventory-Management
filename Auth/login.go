@@ -15,6 +15,7 @@ import (
 type jwtCustomClaims struct {
 	Name  string `json:"name"`
 	Admin bool   `json:"admin"`
+	Id    string `json:"id"`
 	jwt.RegisteredClaims
 }
 
@@ -38,11 +39,12 @@ func Login(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, Response.SystemResponse{Status: http.StatusInternalServerError, Message: "Invalid Password",
 			Data: &echo.Map{"data": err1.Error()}})
 	}
-
+	userIDString := user.ID.Hex()
 	// Set custom claims
 	claims := &jwtCustomClaims{
 		user.Name,
 		user.IsAdmin,
+		userIDString,
 		jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 72)),
 		},

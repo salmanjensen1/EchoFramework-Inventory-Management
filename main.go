@@ -2,6 +2,7 @@ package main
 
 import (
 	"RiseOfProduceManagement/Auth"
+	"RiseOfProduceManagement/Controller"
 	"RiseOfProduceManagement/Response"
 	"RiseOfProduceManagement/configs"
 	"fmt"
@@ -19,11 +20,12 @@ import (
 type jwtCustomClaims struct {
 	Name  string `json:"name"`
 	Admin bool   `json:"admin"`
+	Id    string `json:"id"`
 	jwt.RegisteredClaims
 }
 
 // jwtCustomClaims are custom claims extending default ones.
-// See https://github.com/golang-jwt/jwt for more examples
+// See https://github.com/golang-jwt/jwt for more examplesf
 
 func accessible(c echo.Context) error {
 	return c.String(http.StatusOK, "Accessible")
@@ -105,7 +107,6 @@ func main() {
 	e.GET("/", accessible)
 
 	// Restricted group
-	r := e.Group("/restricted")
 
 	// Configure middleware with the custom claims type
 	config := echojwt.Config{
@@ -114,10 +115,27 @@ func main() {
 		},
 		SigningKey: []byte("secret"),
 	}
-	r.Use(echojwt.WithConfig(config))
-	a := r.Group("/forAdmin", ValidateToken, isAdmin)
+
+	auth := e.Group("/auth")
+	auth.Use(echojwt.WithConfig(config))
+
+	//admin routes
+	a := auth.Group("/forAdmin", ValidateToken, isAdmin)
 	a.GET("/", restricted)
 	a.POST("/make-admin", makeAdmin)
-	r.GET("/forUser", restricted, ValidateToken)
+
+	//user Routes
+
+	//normal routes
+	e.GET("/get-product/:productID", Controller.GetProduct)
+	e.GET("/search-product/:productName", Controller.SearchProduct)
+
+	//auth routes
+	r := auth.Group("/forUser", ValidateToken)
+	r.GET("/", restricted)
+	r.POST("/create-product/:sellerID", Controller.CreateProduct)
+	r.GET("/get-all-product/:sellerID", Controller.GetAllProductsOfASeller)
+	r.PUT("/update-product/:productName", Controller.UpdateProduct)
+	r.DELETE("/delete-product/:productID", Controller.DeleteProduct)
 	e.Logger.Fatal(e.Start(":1323"))
 }

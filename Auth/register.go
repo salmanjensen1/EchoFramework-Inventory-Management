@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/log"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/net/context"
@@ -58,6 +59,7 @@ func Register(c echo.Context) error {
 	}
 
 	passwordHashed := HashPassword(user.Password)
+	user.ID = primitive.NewObjectID()
 
 	newUser := Model.User{
 		ID:       user.ID,
