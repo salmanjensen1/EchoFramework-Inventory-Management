@@ -23,7 +23,7 @@ var validate = validator.New()
 type jwtCustomClaims struct {
 	Name  string `json:"name"`
 	Admin bool   `json:"admin"`
-	ID    string `json:"id"`
+	Id    string `json:"id"`
 	jwt.RegisteredClaims
 }
 
@@ -173,33 +173,36 @@ func UpdateProduct(c echo.Context) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	var product Model.Product
+	var product, reqProduct Model.Product
 
 	//get the data that is to be updated
-	if err := c.Bind(&product); err != nil {
+	if err := c.Bind(&reqProduct); err != nil {
 		return c.String(http.StatusBadRequest, "the request data is not acceptable")
 	}
 
-	if validationErr := validate.Struct(&product); validationErr != nil {
+	if validationErr := validate.Struct(&reqProduct); validationErr != nil {
 		return c.String(http.StatusBadRequest, "Data Validation failed")
 	}
 
 	//get the ID for which the data is to be updated against
 	updateID := c.Param("productID")
 	updateIDObject, _ := primitive.ObjectIDFromHex(updateID)
-
 	err := productCollection.FindOne(ctx, bson.M{"_id": updateIDObject}).Decode(&product)
+
+	//*****************************************************
+
 	user := c.Get("user").(*jwt.Token)
+	fmt.Println(user)
 	claims := user.Claims.(*jwtCustomClaims)
-	id := claims.ID
+	id := claims.Id
 
 	if id != product.SellerID {
 		fmt.Println(err)
 		return c.String(http.StatusForbidden, "You are not authorized to update this product")
 	}
-
+	reqProduct.SellerID = product.SellerID
 	//insert the updated product info against the received id in database
-	result, err1 := productCollection.UpdateOne(ctx, bson.M{"_id": updateIDObject}, bson.M{"$set": product})
+	result, err1 := productCollection.UpdateOne(ctx, bson.M{"_id": updateIDObject}, bson.M{"$set": reqProduct})
 
 	if err1 != nil || result.MatchedCount != 1 {
 		return c.String(500, "Update failed")
