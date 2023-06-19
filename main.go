@@ -67,6 +67,7 @@ func main() {
 	Routes.AuthenticationRoutes(e)
 	Routes.AdminRoutes(e)
 	Routes.ProductRoutes(e)
+	Routes.UserRoutes(e)
 
 	// Restricted routes
 

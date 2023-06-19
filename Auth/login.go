@@ -35,6 +35,10 @@ func Login(c echo.Context) error {
 			Data: &echo.Map{"data": err.Error()}})
 	}
 
+	if user.DeleteStatus == true {
+		return c.String(404, "Your account has been deleted")
+	}
+
 	if err1 := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(reqPassword)); err1 != nil {
 		return c.JSON(http.StatusInternalServerError, Response.SystemResponse{Status: http.StatusInternalServerError, Message: "Invalid Password",
 			Data: &echo.Map{"data": err1.Error()}})

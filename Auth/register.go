@@ -62,14 +62,16 @@ func Register(c echo.Context) error {
 	user.ID = primitive.NewObjectID()
 
 	newUser := Model.User{
-		ID:       user.ID,
-		Name:     user.Name,
-		Username: user.Username,
-		Password: passwordHashed,
-		Email:    user.Email,
-		Phone:    user.Phone,
-		Address:  user.Address,
-		IsAdmin:  false,
+		ID:             user.ID,
+		Name:           user.Name,
+		Username:       user.Username,
+		Password:       passwordHashed,
+		Email:          user.Email,
+		Phone:          user.Phone,
+		Address:        user.Address,
+		IsAdmin:        false,
+		DeleteStatus:   false,
+		AccountBalance: 500,
 	}
 
 	result, err := userCollection.InsertOne(ctx, newUser)

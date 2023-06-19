@@ -28,13 +28,25 @@ func AdminRoutes(e *echo.Echo) {
 	a.POST("/make-admin", Controller.MakeAdmin)
 }
 
+func UserRoutes(e *echo.Echo) {
+	auth := e.Group("/auth")
+	auth.Use(echojwt.WithConfig(configs.Config))
+	//user routes
+	u := auth.Group("/forUser", Middleware.ValidateToken)
+	u.GET("/", configs.Restricted)
+	u.PUT("/update-user/:userID", Controller.UpdateUser)
+	u.DELETE("/delete-user/:userID", Controller.DeleteUser)
+	u.GET("/buy-product", Controller.BuyProduct)
+	u.GET("/add-money/:money", Controller.AddMoneyToAccount)
+}
+
 func ProductRoutes(e *echo.Echo) {
 	auth := e.Group("/auth")
 	auth.Use(echojwt.WithConfig(configs.Config))
 	//user routes
 	r := auth.Group("/forUser", Middleware.ValidateToken)
 	r.GET("/", configs.Restricted)
-	r.POST("/create-product/:sellerID", Controller.CreateProduct)
+	r.POST("/create-product", Controller.CreateProduct)
 	r.GET("/get-all-product/:sellerID", Controller.GetAllProductsOfASeller)
 	r.PUT("/update-product/:productID", Controller.UpdateProduct)
 	r.DELETE("/delete-product/:productID", Controller.DeleteProduct)
