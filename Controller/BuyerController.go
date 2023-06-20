@@ -68,6 +68,11 @@ func BuyProduct(c echo.Context) error {
 		return c.JSON(500, Response.SystemResponse{500, "Seller ID" + sellerID + "not found", &echo.Map{"data": err10.Error()}})
 	}
 
+	//input validation
+	if productQty < 1 {
+		return c.String(500, "Invalid quantity")
+	}
+
 	//calculate remaining quantity
 	remainingQty := product.Quantity - productQty
 	//calculate amount
