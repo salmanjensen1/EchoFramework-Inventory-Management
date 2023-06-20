@@ -32,19 +32,20 @@ func UserRoutes(e *echo.Echo) {
 	auth := e.Group("/auth")
 	auth.Use(echojwt.WithConfig(configs.Config))
 	//user routes
-	u := auth.Group("/forUser", Middleware.ValidateToken)
+	u := auth.Group("/forUser", Middleware.ValidateToken, Middleware.IsNotAdmin)
 	u.GET("/", configs.Restricted)
 	u.PUT("/update-user/:userID", Controller.UpdateUser)
 	u.DELETE("/delete-user/:userID", Controller.DeleteUser)
 	u.GET("/buy-product", Controller.BuyProduct)
 	u.GET("/add-money/:money", Controller.AddMoneyToAccount)
+	u.GET("/view-profile/:userID", Controller.ViewProfile)
 }
 
 func ProductRoutes(e *echo.Echo) {
 	auth := e.Group("/auth")
 	auth.Use(echojwt.WithConfig(configs.Config))
 	//user routes
-	r := auth.Group("/forUser", Middleware.ValidateToken)
+	r := auth.Group("/forUser", Middleware.ValidateToken, Middleware.IsNotAdmin)
 	r.GET("/", configs.Restricted)
 	r.POST("/create-product", Controller.CreateProduct)
 	r.GET("/get-all-product/:sellerID", Controller.GetAllProductsOfASeller)

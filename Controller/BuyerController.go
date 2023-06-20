@@ -67,23 +67,23 @@ func BuyProduct(c echo.Context) error {
 	if err10 != nil {
 		return c.JSON(500, Response.SystemResponse{500, "Seller ID" + sellerID + "not found", &echo.Map{"data": err10.Error()}})
 	}
-	//deduct the quantity of the product
-	product.Quantity = product.Quantity - productQty
 
+	//calculate remaining quantity
+	remainingQty := product.Quantity - productQty
 	//calculate amount
 	amount := product.Price * float64(productQty)
-
-	//update account balance
-	balance := buyer.AccountBalance - amount
-
+	//deduct the quantity of the product
+	if remainingQty < 1 {
+		return c.String(500, "The quantity requested is more than the quantity available")
+	}
 	//check if the user has sufficient fund to buy a product
-	if balance < 0 {
-		fmt.Println("Amount: %f\n  Balance%f", amount, balance)
+	if amount > buyer.AccountBalance {
 		return c.String(500, "Insufficient Funds")
 	}
 	//deduct the amount from the buyer who bought the product
-	buyer.AccountBalance = balance
+	buyer.AccountBalance = buyer.AccountBalance - amount
 	seller.AccountBalance = seller.AccountBalance + amount
+	product.Quantity = product.Quantity - productQty
 
 	//update the user balance in the database
 	result, err2 := userCollection.UpdateOne(ctx, filterBuyer, bson.M{"$set": buyer})

@@ -25,6 +25,15 @@ type productDetails struct {
 	Price    float64
 }
 
+type userDetails struct {
+	Name           string
+	Username       string
+	Email          string
+	Phone          string
+	Address        string
+	AccountBalance float64
+}
+
 func CreateProduct(c echo.Context) error {
 	//close this function if it takes more than 10 seconds time
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -46,6 +55,7 @@ func CreateProduct(c echo.Context) error {
 
 	product.SellerID = sellerID
 	product.ID = primitive.NewObjectID()
+	product.DeleteStatus = false
 
 	if validationError := validate.Struct(&product); validationError != nil {
 		return c.JSON(http.StatusBadRequest, Response.SystemResponse{400, "Data Validation failed. Input data in all required fields",
@@ -71,6 +81,10 @@ func GetProduct(c echo.Context) error {
 	filter := bson.M{"_id": productIDObject}
 	var product Model.Product
 	err1 := productCollection.FindOne(ctx, filter).Decode(&product)
+
+	if product.DeleteStatus == true {
+		return c.String(404, "Product is deleted")
+	}
 
 	if err1 != nil {
 		return c.JSON(http.StatusBadRequest, Response.SystemResponse{400, "Couldn't find the product",
@@ -113,11 +127,12 @@ func SearchProduct(c echo.Context) error {
 		productIDString := product.ID.Hex()
 
 		// Do something with the user document
-
-		mapOfProducts[productIDString] = productDetails{
-			Name:     product.ProductName,
-			Quantity: product.Quantity,
-			Price:    product.Price,
+		if product.DeleteStatus == false {
+			mapOfProducts[productIDString] = productDetails{
+				Name:     product.ProductName,
+				Quantity: product.Quantity,
+				Price:    product.Price,
+			}
 		}
 	}
 
@@ -127,6 +142,9 @@ func SearchProduct(c echo.Context) error {
 	if err1 != nil || products == nil {
 		return c.JSON(http.StatusBadRequest, Response.SystemResponse{400, "Couldn't find the product",
 			&echo.Map{"data": err1.Error()}})
+	}
+	if len(mapOfProducts) < 1 {
+		return c.String(404, "No products found")
 	}
 	return c.JSON(200, Response.SystemResponse{200, "Product found", &echo.Map{"data": mapOfProducts}})
 }
@@ -155,11 +173,12 @@ func GetAllProductsOfASeller(c echo.Context) error {
 		productIDString := product.ID.Hex()
 
 		// Do something with the user document
-
-		mapOfProducts[productIDString] = productDetails{
-			Name:     product.ProductName,
-			Quantity: product.Quantity,
-			Price:    product.Price,
+		if product.DeleteStatus == false {
+			mapOfProducts[productIDString] = productDetails{
+				Name:     product.ProductName,
+				Quantity: product.Quantity,
+				Price:    product.Price,
+			}
 		}
 	}
 
@@ -192,7 +211,7 @@ func UpdateProduct(c echo.Context) error {
 	filter := bson.M{"_id": updateIDObject}
 	err1 := productCollection.FindOne(ctx, filter).Decode(&product)
 
-	if err1 != nil {
+	if err1 != nil || product.DeleteStatus == true {
 		return c.JSON(http.StatusBadRequest, Response.SystemResponse{400, "Couldn't find the product",
 			&echo.Map{"data": err1.Error()}})
 	}
@@ -239,9 +258,12 @@ func DeleteProduct(c echo.Context) error {
 		return c.String(http.StatusForbidden, "You are not authorized to update this product")
 	}
 	//insert the updated product info against the received id in database
-	result, err1 := productCollection.DeleteOne(ctx, filter)
+	//result, err1 := productCollection.DeleteOne(ctx, filter)
 
-	if err1 != nil || result.DeletedCount != 1 {
+	//safe delete the product
+	result, err1 := productCollection.UpdateOne(ctx, filter, bson.M{"$set": bson.M{"deletestatus": true}})
+
+	if err1 != nil || result.MatchedCount != 1 {
 		return c.String(500, "Delete failed")
 	}
 

@@ -14,6 +14,41 @@ import (
 	"time"
 )
 
+func ViewProfile(c echo.Context) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	userID := c.Param("userID")
+	userIDObject, _ := primitive.ObjectIDFromHex(userID)
+
+	filter := bson.M{"_id": userIDObject}
+	var user Model.User
+	err1 := userCollection.FindOne(ctx, filter).Decode(&user)
+
+	if user.DeleteStatus == true {
+		return c.String(404, "User is deleted")
+	}
+
+	if err1 != nil {
+		return c.JSON(http.StatusBadRequest, Response.SystemResponse{400, "Couldn't find the user from DB",
+			&echo.Map{"data": err1.Error()}})
+	}
+
+	mapOfUsers := make(map[string]userDetails)
+
+	mapOfUsers[user.Name] = userDetails{
+		Name:           user.Name,
+		Username:       user.Username,
+		Email:          user.Email,
+		Phone:          user.Phone,
+		Address:        user.Address,
+		AccountBalance: user.AccountBalance,
+	}
+	// Print the empty ObjectID
+
+	return c.JSON(200, Response.SystemResponse{200, "User profile info: ", &echo.Map{"data": mapOfUsers}})
+}
+
 func UpdateUser(c echo.Context) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -27,6 +62,10 @@ func UpdateUser(c echo.Context) error {
 
 	if validationErr := validate.Struct(&reqUserData); validationErr != nil {
 		return c.String(http.StatusBadRequest, "Data Validation failed")
+	}
+
+	if reqUserData.DeleteStatus == true {
+		return c.String(http.StatusBadRequest, "User is deleted")
 	}
 
 	//get the ID for which the data is to be updated against
@@ -81,6 +120,10 @@ func DeleteUser(c echo.Context) error {
 	filter := bson.M{"_id": deleteIdObject}
 	err1 := userCollection.FindOne(ctx, filter).Decode(&user)
 
+	if user.DeleteStatus == true {
+		return c.String(http.StatusBadRequest, "User is already deleted")
+	}
+
 	if err1 != nil {
 		return c.JSON(http.StatusBadRequest, Response.SystemResponse{400, "Couldn't find the user",
 			&echo.Map{"data": err1.Error()}})
@@ -95,11 +138,64 @@ func DeleteUser(c echo.Context) error {
 		return c.String(http.StatusForbidden, "You are not authorized to delete this user")
 	}
 
-	result, err := userCollection.DeleteOne(ctx, bson.M{"_id": deleteIdObject})
+	//result, err := userCollection.DeleteOne(ctx, bson.M{"_id": deleteIdObject})
 
-	if err != nil || result.DeletedCount < 1 {
+	//if err != nil || result.DeletedCount < 1 {
+	//	return c.String(500, "Couldn't delete the user Entry")
+	//}
+
+	//safe delete a user
+	result, err := userCollection.UpdateOne(ctx, bson.M{"_id": deleteIdObject}, bson.M{"$set": bson.M{"deletestatus": true}})
+	if err != nil || result.MatchedCount < 1 {
 		return c.String(500, "Couldn't delete the user Entry")
 	}
 
-	return c.String(200, "deleted user successfully")
+	//cascade delete all the products of the user
+	DeleteAllProductsOfTheSeller(c, deleteIdString)
+	return c.String(200, "deleted user: "+user.Name+" successfully")
+}
+
+func DeleteAllProductsOfTheSeller(c echo.Context, sellerID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{"sellerid": sellerID}
+
+	products, err := productCollection.Find(ctx, filter)
+
+	if products.RemainingBatchLength() < 1 {
+		return c.String(http.StatusNotFound, "No Products found")
+	}
+	mapOfProducts := make(map[string]productDetails)
+	for products.Next(context.TODO()) {
+		var product Model.Product
+		if err := products.Decode(&product); err != nil {
+			// Handle the error
+			return c.String(400, "Error decoding products from database")
+		}
+		fmt.Println(product)
+		product.DeleteStatus = true
+		productIDString := product.ID.Hex()
+
+		// Do something with the user document
+		mapOfProducts[productIDString] = productDetails{
+			Name:     product.ProductName,
+			Quantity: product.Quantity,
+			Price:    product.Price,
+		}
+		result, err := productCollection.UpdateOne(ctx, bson.M{"_id": product.ID}, bson.M{"$set": product})
+		if err != nil || result.MatchedCount < 1 {
+			return c.String(500, "Couldn't update the product Entry")
+		}
+
+	}
+
+	// Close the cursor
+	products.Close(context.TODO())
+
+	if err != nil {
+		return c.JSON(http.StatusNotFound, Response.SystemResponse{400, "Error querying products from database",
+			&echo.Map{"data": err.Error()}})
+	}
+	return c.JSON(200, Response.SystemResponse{200, "Deleted products", &echo.Map{"data": mapOfProducts}})
 }
